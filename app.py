@@ -1,12 +1,12 @@
 import streamlit as st
 import datetime
 import sqlite3
+import pandas as pd  # 新增：用來讀取資料庫並畫出漂亮的表格
 
 # ==========================================
 # 🛡️ 系統底層：本地資料庫與自動計算引擎 (Ops-AI-CRF)
 # ==========================================
 def init_db():
-    """初始化 SQLite 資料庫 (已升級為 v2 避免欄位衝突)"""
     conn = sqlite3.connect('fuxing_guardian_v2.db')
     c = conn.cursor()
     c.execute('''
@@ -26,35 +26,41 @@ def init_db():
     conn.close()
 
 def calculate_readiness(vf, hr, social_mode, micro_workouts, water_intake, water_goal):
-    """加入「微型運動」與「水份達標」的正向加分機制"""
     base_score = 100
     if vf > 10: base_score -= (vf - 10) * 1.5 
     if hr > 65: base_score -= (hr - 65) * 2
     if social_mode: base_score -= 20
-    
-    # 努力回饋：運動加分與喝水加分
     base_score += (micro_workouts * 3)
     if water_intake >= water_goal:
         base_score += 5 
-        
     return max(0, min(100, int(base_score)))
+
+# --- 新增：讀取歷史紀錄的函數 ---
+def load_history():
+    conn = sqlite3.connect('fuxing_guardian_v2.db')
+    # 將資料庫的內容讀取成表格格式，並依照日期由新到舊排序
+    try:
+        df = pd.read_sql_query("SELECT * FROM health_logs ORDER BY date DESC", conn)
+    except:
+        df = pd.DataFrame()
+    conn.close()
+    return df
 
 st.set_page_config(page_title="復興守護者", page_icon="🛡️", layout="centered")
 init_db()
 
 today_date = datetime.date.today()
 today_str = today_date.strftime("%Y-%m-%d")
-is_weekend = today_date.weekday() >= 5 # 判斷是否為週六或週日
+is_weekend = today_date.weekday() >= 5 
 
 # ==========================================
-# 🧠 狀態機初始化 (預設帶入區長的體檢基線)
+# 🧠 狀態機初始化 
 # ==========================================
 if 'social_mode' not in st.session_state: st.session_state.social_mode = False
 if 'metrics' not in st.session_state: st.session_state.metrics = {'vf': 25.0, 'muscle': 26.7, 'bmi': 33.8, 'hr': 63}
 if 'micro_workouts' not in st.session_state: st.session_state.micro_workouts = 0 
 if 'water_intake' not in st.session_state: st.session_state.water_intake = 0 
 
-# 動態水分目標：平時 2000cc，應酬日強制提升至 3000cc 加速代謝
 water_goal = 3000 if st.session_state.social_mode else 2000
 
 if 'readiness_score' not in st.session_state:
@@ -70,7 +76,6 @@ if 'readiness_score' not in st.session_state:
 st.title("🛡️ 復興守護者 (Fuxing Guardian)")
 st.markdown(f"**蘇區長，早安。今天是 {today_str} {'(週末重置日)' if is_weekend else '(市政高壓期)'}**")
 
-# --- 📥 今日數值輸入區 ---
 with st.expander("📥 點此輸入今日最新數值 (同步體脂計)", expanded=False):
     col_a, col_b = st.columns(2)
     with col_a:
@@ -87,7 +92,6 @@ with st.expander("📥 點此輸入今日最新數值 (同步體脂計)", expand
 
 st.divider()
 
-# --- 🔋 綜合狀態儀表板 ---
 st.subheader("🔋 今日身體恢復度 (Readiness)")
 col1, col2 = st.columns(2)
 with col1:
@@ -100,19 +104,13 @@ with col2:
 
 st.divider()
 
-# ==========================================
-# 🌟 新增擴充模組整合區
-# ==========================================
-
 if is_weekend:
-    # --- 🛌 週末皮質醇卸載協議 ---
     st.success("🌲 【週末重置模式啟動】清空一週壓力與胰島素殘留")
     st.markdown("""
     * **14小時微斷食**：建議今日早餐延後至 10:00，讓肝臟與腸胃徹底休假。
     * **大自然迷走神經重置**：放下手機，前往拉拉山或角板山進行 30 分鐘森林漫步，強制降低皮質醇。
     """)
 else:
-    # --- ⏱️ 平日：隨時微護甲 ---
     st.subheader("⏱️ 隨時微護甲 (零碎時間訓練)")
     available_time = st.radio("區長，您現在有多少空檔？", ["3 分鐘 (等車)", "10 分鐘 (辦公室)", "15 分鐘 (視察)"], horizontal=True)
     if "3 分鐘" in available_time:
@@ -130,7 +128,6 @@ else:
 
 st.divider()
 
-# --- 💧 動態水杯引擎 ---
 st.subheader(f"💧 動態水分代謝沖刷 (目標: {water_goal} cc)")
 progress = min(st.session_state.water_intake / water_goal, 1.0)
 st.progress(progress)
@@ -138,19 +135,18 @@ st.write(f"目前已飲用：**{st.session_state.water_intake} cc**")
 
 col_w1, col_w2, col_w3 = st.columns(3)
 with col_w1:
-    if st.button("➕ 喝了一杯水 (250cc)"):
+    if st.button("➕ 喝一杯水 (250cc)"):
         st.session_state.water_intake += 250
         st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.social_mode, st.session_state.micro_workouts, st.session_state.water_intake, water_goal)
         st.rerun()
 with col_w2:
-    if st.button("➕ 喝了一瓶水 (500cc)"):
+    if st.button("➕ 喝一瓶水 (500cc)"):
         st.session_state.water_intake += 500
         st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.social_mode, st.session_state.micro_workouts, st.session_state.water_intake, water_goal)
         st.rerun()
 
 st.divider()
 
-# --- 🍱 會議便當與應酬防禦系統 ---
 st.subheader("🗓️ 飲食控管與應酬防禦")
 
 with st.expander("🍽️ 點此查看：今日會議便當/桌菜破解法", expanded=False):
@@ -173,8 +169,8 @@ else:
         st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], True, st.session_state.micro_workouts, st.session_state.water_intake, 3000)
         st.rerun()
 
-# --- 💾 安全存檔 ---
 st.divider()
+
 if st.button("💾 儲存今日日誌 (存於雲端伺服器空間)"):
     conn = sqlite3.connect('fuxing_guardian_v2.db')
     c = conn.cursor()
@@ -190,4 +186,18 @@ if st.button("💾 儲存今日日誌 (存於雲端伺服器空間)"):
     ))
     conn.commit()
     conn.close()
-    st.toast("✅ 區長，今日完整日誌已成功儲存！")
+    st.success("✅ 區長，今日完整日誌已成功儲存！")
+
+# ==========================================
+# 📖 新增模組：歷史紀錄檢視區塊
+# ==========================================
+st.divider()
+st.subheader("📖 歷史健康日誌 (History Logs)")
+with st.expander("點此查看過去儲存的紀錄", expanded=False):
+    history_df = load_history()
+    if not history_df.empty:
+        # 重新命名欄位讓區長更容易閱讀
+        history_df.columns = ['日期', '內臟脂肪', '骨骼肌(%)', 'BMI', '安靜心率', '綜合評分', '有應酬?', '微訓練(次)', '喝水量(cc)']
+        st.dataframe(history_df, use_container_width=True, hide_index=True)
+    else:
+        st.info("目前還沒有紀錄喔！請按下方的儲存按鈕來建立第一筆日誌。")
