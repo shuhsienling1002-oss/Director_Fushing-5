@@ -6,7 +6,8 @@ import sqlite3
 # 🛡️ 系統底層：本地資料庫與自動計算引擎 (Ops-AI-CRF)
 # ==========================================
 def init_db():
-    conn = sqlite3.connect('fuxing_guardian_private.db')
+    """初始化 SQLite 資料庫 (已升級為 v2 避免欄位衝突)"""
+    conn = sqlite3.connect('fuxing_guardian_v2.db')
     c = conn.cursor()
     c.execute('''
         CREATE TABLE IF NOT EXISTS health_logs (
@@ -174,8 +175,8 @@ else:
 
 # --- 💾 安全存檔 ---
 st.divider()
-if st.button("💾 儲存今日日誌 (存於手機本地)"):
-    conn = sqlite3.connect('fuxing_guardian_private.db')
+if st.button("💾 儲存今日日誌 (存於雲端伺服器空間)"):
+    conn = sqlite3.connect('fuxing_guardian_v2.db')
     c = conn.cursor()
     c.execute('''
         INSERT OR REPLACE INTO health_logs 
@@ -189,4 +190,4 @@ if st.button("💾 儲存今日日誌 (存於手機本地)"):
     ))
     conn.commit()
     conn.close()
-    st.toast("✅ 區長，今日完整日誌已安全加密儲存！")
+    st.toast("✅ 區長，今日完整日誌已成功儲存！")
