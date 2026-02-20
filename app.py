@@ -1,57 +1,69 @@
 import streamlit as st
 import datetime
 
-# --- [設定] 頁面與暗黑模式強制 (UI/UX-CRF v6.4) ---
-st.set_page_config(page_title="復興守護者", page_icon="🛡️", layout="centered")
+# --- UI/UX 暗黑模式與設定 ---
+st.set_page_config(page_title="復興守護者 24H", page_icon="🛡️", layout="centered")
 
-# --- [邏輯] 模擬本地狀態機 (HRA-CRF v6.4) ---
+# --- 模擬狀態機 (Session State) ---
 if 'social_mode' not in st.session_state:
     st.session_state.social_mode = False
-if 'energy_level' not in st.session_state:
-    st.session_state.energy_level = 85 # 模擬初始能量電池
+if 'drank_last_night' not in st.session_state:
+    st.session_state.drank_last_night = False
 
-def toggle_social_mode():
+# 取得當前小時 (用於動態顯示起居任務)
+current_hour = datetime.datetime.now().hour
+
+def toggle_social():
     st.session_state.social_mode = not st.session_state.social_mode
     if st.session_state.social_mode:
-        st.session_state.energy_level -= 30 # 應酬預扣能量
+        st.session_state.drank_last_night = True # 假設今晚應酬，明早啟動代償
 
-# --- [介面] 模組 B：後置校準層 (模糊渲染) ---
-st.title("🛡️ 復興守護者")
-st.markdown(f"**蘇區長，您好。今天是 {datetime.date.today().strftime('%Y-%m-%d')}**")
-
+st.title("🛡️ 復興守護者：24H 生理節律")
 st.divider()
 
-# 1. 狀態指示器 (模糊化精確數據，降低焦慮)
-col1, col2 = st.columns(2)
-with col1:
-    if st.session_state.energy_level > 60:
-        st.metric(label="今日能量電池", value=f"{st.session_state.energy_level}%", delta="狀態良好")
-    else:
-        st.metric(label="今日能量電池", value=f"{st.session_state.energy_level}%", delta="- 需啟動修復", delta_color="inverse")
+# --- 根據時間動態渲染生活起居任務 ---
+st.subheader("📍 當下最佳行動 (Next Best Action)")
 
-with col2:
+if 5 <= current_hour < 9:
+    st.info("🌅 【晨間重置期】")
+    st.checkbox("💧 飲用 500cc 溫鹽水 (沖刷代謝物)")
+    st.checkbox("☀️ 戶外接觸陽光 10 分鐘 (重置褪黑激素)")
+    if st.session_state.drank_last_night:
+        st.error("🚨 昨夜應酬檢測：今日強制跳過早餐，執行 16 小時斷食，僅限黑咖啡/水。")
+    else:
+        st.success("🟢 今日可正常享用高蛋白早餐。")
+
+elif 9 <= current_hour < 17:
+    st.info("⛰️ 【高壓辦公期】")
+    st.write("利用會議空檔，防止骨骼肌流失：")
+    st.checkbox("🦵 完成 15 下辦公椅深蹲 (激活大腿肌群)")
+    st.checkbox("🥗 午餐防禦：順序必須是「菜 ➔ 肉 ➔ 飯」")
+
+elif 17 <= current_hour < 21:
+    st.info("🍷 【晚間防禦期】")
     if st.session_state.social_mode:
-        st.error("🍷 應酬防禦已啟動")
+        st.warning("⚠️ 應酬防禦已啟動！")
+        st.checkbox("🥚 赴宴前：已吃兩顆茶葉蛋墊胃")
+        st.checkbox("🚫 酒局中：拒絕最後一道炒飯/麵線")
+        st.checkbox("💧 飲酒法則：一杯酒配一杯水")
     else:
-        st.success("🟢 代謝平衡中")
+        st.success("🟢 今晚無應酬，建議 19:30 前完成晚餐。")
+        if st.button("🍷 臨時追加應酬 (啟動損害控管)"):
+            toggle_social()
 
-st.divider()
-
-# 2. 戰術執行：一鍵應酬模式
-st.subheader("🗓️ 行程防禦協議")
-if st.session_state.social_mode:
-    st.warning("⚠️ 今晚有高壓行程。請於 18:00 前攝取兩顆茶葉蛋或無糖豆漿，建立腸道屏障。")
-    st.info("💡 明日早晨已自動為您鎖定高強度運動，替換為「16小時溫和斷食」與「深呼吸 3 分鐘」。")
-    if st.button("✅ 應酬結束 (啟動重置)"):
-        toggle_social_mode()
 else:
-    st.write("今日無特殊高壓行程，建議維持 Zone 2 基礎有氧。")
-    if st.button("🍷 啟動應酬模式 (今晚有局)"):
-        toggle_social_mode()
+    st.info("🌙 【夜間降落期】")
+    st.write("強制降低皮質醇，準備進入深度修復：")
+    st.checkbox("🚿 已洗熱水澡 (促使核心降溫)")
+    st.checkbox("🫁 躺床後執行 4-7-8 呼吸法 (4次循環)")
+    if st.session_state.social_mode:
+        if st.button("✅ 應酬結束，準備就寢 (重置系統)"):
+            st.session_state.social_mode = False
 
 st.divider()
 
-# 3. 復興區微步道推薦 (地理圍欄概念)
-st.subheader("⛰️ 零碎時間微訓練")
-st.write("根據您的 GPS 定位，距離下個會議還有 20 分鐘：")
-st.button("🚶‍♂️ 啟動：角板山行館周邊 15 分鐘微喘步道 (Zone 2)")
+# --- 隱藏焦慮數據，只顯示趨勢 (模糊渲染層) ---
+st.subheader("📊 身體防線狀態")
+col1, col2 = st.columns(2)
+col1.metric("內臟脂肪壓力", "警戒中", delta="利用微型深蹲對抗", delta_color="off")
+col2.metric("心血管代償", "優良", delta="BP 119 / HR 63", delta_color="normal")
