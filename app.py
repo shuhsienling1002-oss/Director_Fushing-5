@@ -117,7 +117,7 @@ if is_weekend:
     st.success("🌲 【週末重置模式啟動】清空一週壓力與胰島素殘留")
     st.markdown("* **14小時微斷食**：建議今日早餐延後至 10:00。\n* **大自然迷走神經重置**：30 分鐘森林漫步。")
 else:
-    st.subheader("⏱️ 隨時微護甲 (零碎時間訓練)")
+    st.subheader("⏱️ 零碎時間運動")
     available_time = st.radio("區長，您現在有多少空檔？", ["3 分鐘", "10 分鐘", "15 分鐘"], horizontal=True)
     if "3 分鐘" in available_time: st.write("🪑 **辦公椅深蹲 (15下)** + 🧱 **靠牆伏地挺身 (15下)**")
     elif "10 分鐘" in available_time: st.write("🚶‍♂️ **原地高抬腿 (3分鐘)** + 🪜 **階梯微喘 (5分鐘)** + 🫁 **深呼吸 (2分鐘)**")
@@ -132,7 +132,7 @@ else:
 st.divider()
 
 # --- 💧 動態水杯 ---
-st.subheader(f"💧 動態水分代謝沖刷 (目標: {water_goal} cc)")
+st.subheader(f"💧 喝水 (目標: {water_goal} cc)")
 progress = min(st.session_state.water_intake / water_goal, 1.0)
 st.progress(progress)
 st.write(f"目前已飲用：**{st.session_state.water_intake} cc**")
@@ -184,7 +184,7 @@ if st.session_state.social_mode:
         st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], False, st.session_state.micro_workouts, st.session_state.water_intake, 2000)
         st.rerun()
 else:
-    if st.button("🍷 臨時追加應酬 (立即上調水分目標並啟動防禦)"):
+    if st.button("🍷 臨時追加應酬"):
         st.session_state.social_mode = True
         st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], True, st.session_state.micro_workouts, st.session_state.water_intake, 3000)
         st.rerun()
@@ -291,4 +291,5 @@ with tab2:
                         st.rerun()
     else:
         st.write("目前沒有可修改的歷史紀錄。")
+
 
