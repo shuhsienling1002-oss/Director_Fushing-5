@@ -151,13 +151,34 @@ with col_w2:
 
 st.divider()
 
-# --- 🗓️ 應酬防禦 ---
+# --- 🗓️ 應酬防禦與戰術酒單 (新增模組) ---
 st.subheader("🗓️ 飲食控管與應酬防禦")
 with st.expander("🍽️ 點此查看：今日會議便當/桌菜破解法", expanded=False):
     st.markdown("1. 先吃青菜 2. 再吃蛋白質 3. 白飯最後吃且減半 4. 一口肥肉配兩口菜")
 
 if st.session_state.social_mode:
     st.warning("⚠️ 應酬防禦已啟動：請堅守 1:1 水分法則，**絕對拒絕**收尾澱粉！")
+    
+    # 🌟 新增：戰術酒單與排毒設定 🌟
+    st.markdown("### 🍷 戰術酒單與排毒設定")
+    alcohol_type = st.radio(
+        "請選擇今晚的主戰酒類：",
+        ["🥃 烈酒 (高粱/威士忌/伏特加) - 首選", "🍷 葡萄酒 (紅/白酒) - 次選", "🍺 啤酒/調酒 - 絕對地雷"]
+    )
+    
+    if "烈酒" in alcohol_type:
+        st.info("🟢 **傷害評估：低**。零碳水化合物。請嚴守「喝一口酒，配兩口水」，加速乙醇排出。")
+        fasting_time = 14
+    elif "葡萄酒" in alcohol_type:
+        st.info("🟡 **傷害評估：中**。含有微量殘糖。赴宴前請務必吞服 B 群補充體力。")
+        fasting_time = 15
+    else:
+        st.error("🚨 **傷害評估：核彈級**。大量液體麵包與果糖！將直接轉化為內臟脂肪。")
+        st.markdown("> **系統介入**：已自動將明日「排毒微斷食」時間延長至 **16小時**。強烈建議赴宴前吃兩顆茶葉蛋墊胃！")
+        fasting_time = 16
+        
+    st.markdown(f"**⏳ 明日排毒計畫**：預計需執行 **{fasting_time} 小時** 溫和微斷食 (僅喝水/黑咖啡)。")
+    
     if st.button("✅ 應酬平安結束 (解除防禦)"):
         st.session_state.social_mode = False
         st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], False, st.session_state.micro_workouts, st.session_state.water_intake, 2000)
@@ -190,18 +211,16 @@ if st.button("💾 儲存今日日誌 (存於雲端伺服器空間)"):
     st.success("✅ 區長，今日完整日誌已成功儲存！請至下方查看紀錄。")
 
 # ==========================================
-# 📖 歷史紀錄與管理模組 (新增修改/刪除功能)
+# 📖 歷史紀錄與管理模組 (修改/刪除功能)
 # ==========================================
 st.divider()
 st.subheader("📖 歷史健康日誌管理")
 
-# 使用 Tabs 讓介面更簡潔
 tab1, tab2 = st.tabs(["📊 查看歷史紀錄", "✏️ 修改 / 刪除紀錄"])
 
 with tab1:
     history_df = load_history()
     if not history_df.empty:
-        # 複製一份用於顯示，避免改到原始 DataFrame 結構
         display_df = history_df.copy()
         display_df.columns = ['日期', '內臟脂肪', '骨骼肌(%)', 'BMI', '安靜心率', '血壓(mmHg)', '綜合評分', '有應酬?', '微訓練(次)', '喝水量(cc)']
         st.dataframe(display_df, use_container_width=True, hide_index=True)
@@ -210,11 +229,9 @@ with tab1:
 
 with tab2:
     if not history_df.empty:
-        # 下拉選單選擇要修改的日期
         dates_list = history_df['date'].tolist()
         selected_date = st.selectbox("請選擇要修改的日期：", dates_list)
         
-        # 從資料庫抓取該日期的原始資料
         conn = sqlite3.connect('fuxing_guardian_v3.db')
         c = conn.cursor()
         c.execute("SELECT visceral_fat, muscle_mass, bmi, resting_hr, blood_pressure, social_mode_active, micro_workouts_done, water_intake_cc FROM health_logs WHERE date=?", (selected_date,))
@@ -223,8 +240,6 @@ with tab2:
 
         if row:
             vf, muscle, bmi, hr, bp, social, workouts, water = row
-            
-            # 解析血壓字串 (例如 "119/79")
             try:
                 bp_sys, bp_dia = map(int, bp.split('/'))
             except:
@@ -232,7 +247,6 @@ with tab2:
 
             st.caption(f"正在編輯：**{selected_date}** 的日誌")
             
-            # 建立編輯表單
             with st.container(border=True):
                 col_e1, col_e2 = st.columns(2)
                 with col_e1:
@@ -248,7 +262,6 @@ with tab2:
                 
                 e_social = st.checkbox("當天有應酬嗎？", value=bool(social), key="esocial")
 
-                # 修改與刪除按鈕
                 col_btn1, col_btn2 = st.columns(2)
                 with col_btn1:
                     if st.button("💾 更新這筆紀錄", type="primary", use_container_width=True):
