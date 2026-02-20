@@ -4,9 +4,10 @@ import sqlite3
 import pandas as pd
 
 # ==========================================
-# 🛡️ 系統底層：本地資料庫與自動計算引擎
+# 🛡️ 系統底層：本地資料庫與自動計算引擎 (Ops-AI-CRF)
 # ==========================================
 def init_db():
+    """初始化 SQLite v3 資料庫，確保區長隱私數據本地化存儲"""
     conn = sqlite3.connect('fuxing_guardian_v3.db')
     c = conn.cursor()
     c.execute('''
@@ -27,13 +28,16 @@ def init_db():
     conn.close()
 
 def calculate_readiness(vf, hr, bp_sys, social_mode, micro_workouts, water_intake, water_goal):
-    """計算綜合評分"""
+    """根據生理數據與行為動態計算今日身體恢復度"""
     base_score = 100
+    # 內臟脂肪負荷扣分
     if vf > 10: base_score -= (vf - 10) * 1.5 
+    # 自律神經與心血管負擔扣分
     if hr > 65: base_score -= (hr - 65) * 2
     if bp_sys > 130: base_score -= (bp_sys - 130) * 1 
-    if social_mode: base_score -= 20
+    if social_mode: base_score -= 20 # 應酬模式預扣能量
     
+    # 復原行為加分
     base_score += (micro_workouts * 3)
     if water_intake >= water_goal:
         base_score += 5 
@@ -41,7 +45,7 @@ def calculate_readiness(vf, hr, bp_sys, social_mode, micro_workouts, water_intak
     return max(0, min(100, int(base_score)))
 
 def load_history():
-    """讀取歷史紀錄"""
+    """讀取歷史健康日誌紀錄"""
     conn = sqlite3.connect('fuxing_guardian_v3.db')
     try:
         df = pd.read_sql_query("SELECT * FROM health_logs ORDER BY date DESC", conn)
@@ -55,10 +59,10 @@ init_db()
 
 today_date = datetime.date.today()
 today_str = today_date.strftime("%Y-%m-%d")
-is_weekend = today_date.weekday() >= 5 
+is_weekend = today_date.weekday() >= 5 # 週六與週日判定
 
 # ==========================================
-# 🧠 狀態機初始化 
+# 🧠 狀態機初始化 (綁定蘇區長體檢基線)
 # ==========================================
 if 'social_mode' not in st.session_state: st.session_state.social_mode = False
 if 'metrics' not in st.session_state: 
@@ -66,6 +70,7 @@ if 'metrics' not in st.session_state:
 if 'micro_workouts' not in st.session_state: st.session_state.micro_workouts = 0 
 if 'water_intake' not in st.session_state: st.session_state.water_intake = 0 
 
+# 動態水分目標：應酬日上調以加速乙醛代謝
 water_goal = 3000 if st.session_state.social_mode else 2000
 
 if 'readiness_score' not in st.session_state:
@@ -75,9 +80,9 @@ if 'readiness_score' not in st.session_state:
     )
 
 # ==========================================
-# 🎨 介面層：區長專屬動態儀表板
+# 🎨 介面層：區長專屬動態 UI
 # ==========================================
-st.title("🛡️ 復興守護者")
+st.title("🛡️ 復興守護者 (Fuxing Guardian)")
 st.markdown(f"**蘇區長，早安。今天是 {today_str} {'(週末重置日)' if is_weekend else '(市政高壓期)'}**")
 
 # --- 📥 今日數值輸入區 ---
@@ -104,24 +109,29 @@ st.subheader("🔋 今日身體恢復度 (Readiness)")
 col1, col2 = st.columns(2)
 with col1:
     if st.session_state.readiness_score >= 70:
-        st.metric("代謝綜合評分", f"{st.session_state.readiness_score}%", "狀態穩定")
+        st.metric("代謝綜合評分", f"{st.session_state.readiness_score}%", "狀態穩定：適合決策")
     else:
-        st.metric("代謝綜合評分", f"{st.session_state.readiness_score}%", "- 肝臟/皮質醇負載重", delta_color="inverse")
+        st.metric("代謝綜合評分", f"{st.session_state.readiness_score}%", "- 肝臟/皮質醇負荷重", delta_color="inverse")
 with col2:
-    st.metric("心血管防線 (血壓)", f"{st.session_state.metrics['bp_sys']}/{st.session_state.metrics['bp_dia']}", "優良狀態")
+    st.metric("心血管防線 (血壓)", f"{st.session_state.metrics['bp_sys']}/{st.session_state.metrics['bp_dia']}", "優良防護中")
 
 st.divider()
 
 # --- 擴充模組整合區 ---
 if is_weekend:
-    st.success("🌲 【週末重置模式啟動】清空一週壓力與胰島素殘留")
-    st.markdown("* **14小時微斷食**：建議今日早餐延後至 10:00。\n* **大自然迷走神經重置**：30 分鐘森林漫步。")
+    # 🛌 週末重置協議
+    st.success("🌲 【週末重置模式啟動】清空壓力與胰島素殘留")
+    st.markdown("""
+    * **14小時微斷食**：建議今日早餐延後至 10:00，減少胰島素分泌。
+    * **自然環境修復**：放下手機，進行 30 分鐘森林漫步，重置迷走神經。
+    """)
 else:
-    st.subheader("⏱️ 零碎時間運動")
+    # ⏱️ 零碎時間運動 (MED 訓練)
+    st.subheader("⏱️ 零碎時間運動 (Micro-Workouts)")
     available_time = st.radio("區長，您現在有多少空檔？", ["3 分鐘", "10 分鐘", "15 分鐘"], horizontal=True)
     if "3 分鐘" in available_time: st.write("🪑 **辦公椅深蹲 (15下)** + 🧱 **靠牆伏地挺身 (15下)**")
     elif "10 分鐘" in available_time: st.write("🚶‍♂️ **原地高抬腿 (3分鐘)** + 🪜 **階梯微喘 (5分鐘)** + 🫁 **深呼吸 (2分鐘)**")
-    else: st.write("⛰️ **微喘步道健行**：維持「微喘」連續步行 15 分鐘。")
+    else: st.write("⛰️ **微喘步道健行**：維持「微喘但能對話」速度步行 15 分鐘。")
     
     if st.button("✅ 完成一次微訓練 (+3分)"):
         st.session_state.micro_workouts += 1
@@ -131,13 +141,12 @@ else:
 
 st.divider()
 
-# --- 💧 動態水杯 ---
-st.subheader(f"💧 喝水 (目標: {water_goal} cc)")
+# --- 💧 動態水杯引擎 ---
+st.subheader(f"💧 喝水進度 (目標: {water_goal} cc)")
 progress = min(st.session_state.water_intake / water_goal, 1.0)
 st.progress(progress)
 st.write(f"目前已飲用：**{st.session_state.water_intake} cc**")
-
-col_w1, col_w2, col_w3 = st.columns(3)
+col_w1, col_w2 = st.columns(2)
 with col_w1:
     if st.button("➕ 喝一杯水 (250cc)"):
         st.session_state.water_intake += 250
@@ -151,48 +160,41 @@ with col_w2:
 
 st.divider()
 
-# --- 🗓️ 應酬防禦與戰術酒單 (新增模組) ---
+# --- 🗓️ 應酬防禦與酒精衝擊分析 (關鍵升級) ---
 st.subheader("🗓️ 飲食控管與應酬防禦")
-with st.expander("🍽️ 點此查看：今日會議便當/桌菜破解法", expanded=False):
-    st.markdown("1. 先吃青菜 2. 再吃蛋白質 3. 白飯最後吃且減半 4. 一口肥肉配兩口菜")
+with st.expander("🍽️ 查看：今日會議便當/桌菜破解法", expanded=False):
+    st.markdown("1. 先吃青菜 ➔ 2. 再吃蛋白質 ➔ 3. 白飯最後吃且減半 ➔ 4. 一口肥肉配兩口菜")
 
 if st.session_state.social_mode:
-    st.warning("⚠️ 應酬防禦已啟動：請堅守 1:1 水分法則(每喝下一口酒，就必須緊接著喝下同等份量（甚至更多）的白開水。)，**絕對拒絕**收尾澱粉！")
+    st.warning("⚠️ 應酬防禦已啟動：嚴守 1:1 水分法則，**絕對拒絕**收尾澱粉！")
     
-    # 🌟 新增：戰術酒單與排毒設定 🌟
-    st.markdown("### 🍷 戰術酒單與排毒設定")
-    alcohol_type = st.radio(
-        "請選擇今晚的主戰酒類：",
-        ["🥃 烈酒 (高粱/威士忌/伏特加) - 首選", "🍷 葡萄酒 (紅/白酒) - 次選", "🍺 啤酒/調酒 - 絕對地雷"]
-    )
+    st.markdown("### 🍷 酒精對內臟脂肪 (目前: 25) 的衝擊評估")
+    col_alc1, col_alc2 = st.columns(2)
+    with col_alc1:
+        alc_type = st.selectbox("飲用酒類", ["烈酒 (高粱/威士忌)", "葡萄酒", "啤酒"])
+        alc_count = st.number_input("飲用杯數", min_value=1, value=1)
     
-    if "烈酒" in alcohol_type:
-        st.info("🟢 **傷害評估：低**。零碳水化合物。請嚴守「喝一口酒，配兩口水」，加速乙醇排出。")
-        fasting_time = 14
-    elif "葡萄酒" in alcohol_type:
-        st.info("🟡 **傷害評估：中**。含有微量殘糖。赴宴前請務必吞服 B 群補充體力。")
-        fasting_time = 15
-    else:
-        st.error("🚨 **傷害評估：核彈級**。大量液體麵包與果糖！將直接轉化為內臟脂肪。")
-        st.markdown("> **系統介入**：已自動將明日「排毒微斷食」時間延長至 **16小時**。強烈建議赴宴前吃兩顆茶葉蛋墊胃！")
-        fasting_time = 16
-        
-    st.markdown(f"**⏳ 明日排毒計畫**：預計需執行 **{fasting_time} 小時** 溫和微斷食 (僅喝水/黑咖啡)。")
+    # 計算衝擊：酒精會暫停燃脂，碳水會直接轉化為脂肪
+    burn_pause = alc_count * (1.5 if alc_type == "烈酒 (高粱/威士忌)" else 1.0)
+    fat_risk = "🔥 極高 (液體麵包)" if alc_type == "啤酒" else "📈 高 (代謝路徑霸擋)"
+    
+    with col_alc2:
+        st.info(f"🛑 **燃脂停滯**：{burn_pause} 小時")
+        st.error(f"⚠️ **脂肪囤積風險**：{fat_risk}")
     
     if st.button("✅ 應酬平安結束 (解除防禦)"):
         st.session_state.social_mode = False
-        st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], False, st.session_state.micro_workouts, st.session_state.water_intake, 2000)
         st.rerun()
 else:
-    if st.button("🍷 臨時追加應酬"):
+    if st.button("🍷 臨時追加應酬 (啟動損害控管)"):
         st.session_state.social_mode = True
         st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], True, st.session_state.micro_workouts, st.session_state.water_intake, 3000)
         st.rerun()
 
 st.divider()
 
-# --- 💾 存檔按鈕 ---
-if st.button("💾 儲存今日日誌 (存於雲端伺服器空間)"):
+# --- 💾 存檔與管理模組 ---
+if st.button("💾 儲存今日完整日誌"):
     bp_str = f"{st.session_state.metrics['bp_sys']}/{st.session_state.metrics['bp_dia']}"
     conn = sqlite3.connect('fuxing_guardian_v3.db')
     c = conn.cursor()
@@ -200,97 +202,26 @@ if st.button("💾 儲存今日日誌 (存於雲端伺服器空間)"):
         INSERT OR REPLACE INTO health_logs 
         (date, visceral_fat, muscle_mass, bmi, resting_hr, blood_pressure, readiness_score, social_mode_active, micro_workouts_done, water_intake_cc) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        today_str, st.session_state.metrics['vf'], st.session_state.metrics['muscle'], 
-        st.session_state.metrics['bmi'], st.session_state.metrics['hr'], bp_str,
-        st.session_state.readiness_score, st.session_state.social_mode, 
-        st.session_state.micro_workouts, st.session_state.water_intake
-    ))
+    ''', (today_str, st.session_state.metrics['vf'], st.session_state.metrics['muscle'], st.session_state.metrics['bmi'], st.session_state.metrics['hr'], bp_str, st.session_state.readiness_score, st.session_state.social_mode, st.session_state.micro_workouts, st.session_state.water_intake))
     conn.commit()
     conn.close()
-    st.success("✅ 區長，今日完整日誌已成功儲存！請至下方查看紀錄。")
+    st.success("✅ 區長，今日完整數據已成功備份！")
 
-# ==========================================
-# 📖 歷史紀錄與管理模組 (修改/刪除功能)
-# ==========================================
 st.divider()
-st.subheader("📖 歷史健康日誌管理")
-
-tab1, tab2 = st.tabs(["📊 查看歷史紀錄", "✏️ 修改 / 刪除紀錄"])
-
-with tab1:
+st.subheader("📖 歷史健康管理 (History & Edit)")
+tab_view, tab_edit = st.tabs(["📊 查看趨勢", "✏️ 修改/刪除"])
+with tab_view:
     history_df = load_history()
     if not history_df.empty:
-        display_df = history_df.copy()
-        display_df.columns = ['日期', '內臟脂肪', '骨骼肌(%)', 'BMI', '安靜心率', '血壓(mmHg)', '綜合評分', '有應酬?', '微訓練(次)', '喝水量(cc)']
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
-    else:
-        st.info("目前還沒有紀錄喔！請按下方的儲存按鈕來建立第一筆日誌。")
-
-with tab2:
+        history_df.columns = ['日期', '內臟脂肪', '骨骼肌(%)', 'BMI', '安靜心率', '血壓(mmHg)', '恢復度', '有應酬?', '微訓練', '喝水(cc)']
+        st.dataframe(history_df, use_container_width=True, hide_index=True)
+with tab_edit:
     if not history_df.empty:
-        dates_list = history_df['date'].tolist()
-        selected_date = st.selectbox("請選擇要修改的日期：", dates_list)
-        
-        conn = sqlite3.connect('fuxing_guardian_v3.db')
-        c = conn.cursor()
-        c.execute("SELECT visceral_fat, muscle_mass, bmi, resting_hr, blood_pressure, social_mode_active, micro_workouts_done, water_intake_cc FROM health_logs WHERE date=?", (selected_date,))
-        row = c.fetchone()
-        conn.close()
-
-        if row:
-            vf, muscle, bmi, hr, bp, social, workouts, water = row
-            try:
-                bp_sys, bp_dia = map(int, bp.split('/'))
-            except:
-                bp_sys, bp_dia = 120, 80
-
-            st.caption(f"正在編輯：**{selected_date}** 的日誌")
-            
-            with st.container(border=True):
-                col_e1, col_e2 = st.columns(2)
-                with col_e1:
-                    e_vf = st.number_input("內臟脂肪", value=float(vf), step=0.5, key="evf")
-                    e_bp_sys = st.number_input("收縮壓 (高壓)", value=int(bp_sys), step=1, key="ebpsys")
-                    e_water = st.number_input("喝水量 (cc)", value=int(water), step=100, key="ewater")
-                    e_workouts = st.number_input("微訓練 (次數)", value=int(workouts), step=1, key="eworkouts")
-                with col_e2:
-                    e_muscle = st.number_input("骨骼肌 (%)", value=float(muscle), step=0.1, key="emuscle")
-                    e_bp_dia = st.number_input("舒張壓 (低壓)", value=int(bp_dia), step=1, key="ebpdia")
-                    e_hr = st.number_input("安靜心率", value=int(hr), step=1, key="ehr")
-                    e_bmi = st.number_input("BMI", value=float(bmi), step=0.1, key="ebmi")
-                
-                e_social = st.checkbox("當天有應酬嗎？", value=bool(social), key="esocial")
-
-                col_btn1, col_btn2 = st.columns(2)
-                with col_btn1:
-                    if st.button("💾 更新這筆紀錄", type="primary", use_container_width=True):
-                        e_bp_str = f"{e_bp_sys}/{e_bp_dia}"
-                        e_goal = 3000 if e_social else 2000
-                        e_score = calculate_readiness(e_vf, e_hr, e_bp_sys, e_social, e_workouts, e_water, e_goal)
-                        
-                        conn = sqlite3.connect('fuxing_guardian_v3.db')
-                        c = conn.cursor()
-                        c.execute('''
-                            UPDATE health_logs 
-                            SET visceral_fat=?, muscle_mass=?, bmi=?, resting_hr=?, blood_pressure=?, readiness_score=?, social_mode_active=?, micro_workouts_done=?, water_intake_cc=?
-                            WHERE date=?
-                        ''', (e_vf, e_muscle, e_bmi, e_hr, e_bp_str, e_score, e_social, e_workouts, e_water, selected_date))
-                        conn.commit()
-                        conn.close()
-                        st.success(f"✅ {selected_date} 的紀錄已成功更新！")
-                        st.rerun()
-                with col_btn2:
-                    if st.button("🗑️ 刪除這筆紀錄", use_container_width=True):
-                        conn = sqlite3.connect('fuxing_guardian_v3.db')
-                        c = conn.cursor()
-                        c.execute("DELETE FROM health_logs WHERE date=?", (selected_date,))
-                        conn.commit()
-                        conn.close()
-                        st.warning(f"🗑️ {selected_date} 的紀錄已刪除！")
-                        st.rerun()
-    else:
-        st.write("目前沒有可修改的歷史紀錄。")
-
-
-
+        selected_date = st.selectbox("選擇日期：", history_df['日期'].tolist())
+        if st.button("🗑️ 刪除該日紀錄"):
+            conn = sqlite3.connect('fuxing_guardian_v3.db')
+            c = conn.cursor()
+            c.execute("DELETE FROM health_logs WHERE date=?", (selected_date,))
+            conn.commit()
+            conn.close()
+            st.rerun()
