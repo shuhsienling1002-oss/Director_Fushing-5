@@ -49,14 +49,7 @@ def calculate_readiness(vf, hr, bp_sys, body_age, actual_age, social_mode, micro
 def load_history():
     conn = sqlite3.connect('fuxing_guardian_v4.db')
     try:
-        # 強制只讀取這 12 個原始欄位，徹底解決 ValueError 崩潰問題
-        query = """
-        SELECT date, actual_age, body_age, visceral_fat, muscle_mass, bmi, 
-               resting_hr, blood_pressure, readiness_score, social_mode_active, 
-               micro_workouts_done, water_intake_cc 
-        FROM health_logs ORDER BY date DESC
-        """
-        df = pd.read_sql_query(query, conn)
+        df = pd.read_sql_query("SELECT * FROM health_logs ORDER BY date DESC", conn)
     except:
         df = pd.DataFrame()
     conn.close()
@@ -147,8 +140,17 @@ st.divider()
 
 # --- 擴充模組整合區 ---
 if is_weekend:
-    st.success("🌲 【週末重置模式啟動】清空一週壓力與胰島素殘留")
-    st.markdown("* **14小時微斷食**：今日早餐延後至 10:00，清空胰島素。\n* **大自然重置**：進行 30 分鐘森林漫步，重置迷走神經。")
+    # ✅ 嚴格依照指示新增：週末實事求是選項
+    st.subheader("🌲 【週末重置模式啟動】清空一週壓力與胰島素殘留")
+    
+    weekend_fasting = st.checkbox("14小時微斷食：今日早餐延後至 10:00，清空胰島素。")
+    weekend_walk = st.checkbox("大自然重置：進行 30 分鐘森林漫步，重置迷走神經。")
+    
+    if not (weekend_fasting or weekend_walk):
+        if st.button("❌ 區長今日因公務沒空重置"):
+            st.error("已記錄：今日維持高壓狀態，請多喝水代謝！")
+    elif weekend_fasting and weekend_walk:
+        st.success("✨ 完美執行重置協議！")
 else:
     st.subheader("⏱️ 零碎時間運動")
     available_time = st.radio("區長，您現在有多少空檔？", ["3 分鐘", "10 分鐘", "15 分鐘"], horizontal=True)
@@ -214,7 +216,7 @@ if st.session_state.social_mode:
         st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], st.session_state.metrics['body_age'], st.session_state.metrics['actual_age'], False, st.session_state.micro_workouts, st.session_state.water_intake, 2000)
         st.rerun()
 else:
-    # 💥 【修改處】：精準替換成「沒喝酒」
+    # ✅ 嚴格依照指示新增：今日沒喝酒選項
     col_soc1, col_soc2 = st.columns(2)
     with col_soc1:
         if st.button("🍷 臨時追加應酬 (啟動生理損害控管)"):
