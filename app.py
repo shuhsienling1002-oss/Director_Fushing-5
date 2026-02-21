@@ -49,7 +49,8 @@ def calculate_readiness(vf, hr, bp_sys, body_age, actual_age, social_mode, micro
 def load_history():
     conn = sqlite3.connect('fuxing_guardian_v4.db')
     try:
-        df = pd.read_sql_query("SELECT * FROM health_logs ORDER BY date DESC", conn)
+        # 💥 唯一修改處：把 SELECT * 替換成具體的 12 個欄位，徹底解決歷史紀錄 ValueError 崩潰
+        df = pd.read_sql_query("SELECT date, actual_age, body_age, visceral_fat, muscle_mass, bmi, resting_hr, blood_pressure, readiness_score, social_mode_active, micro_workouts_done, water_intake_cc FROM health_logs ORDER BY date DESC", conn)
     except:
         df = pd.DataFrame()
     conn.close()
