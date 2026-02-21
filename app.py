@@ -49,7 +49,7 @@ def calculate_readiness(vf, hr, bp_sys, body_age, actual_age, social_mode, micro
 def load_history():
     conn = sqlite3.connect('fuxing_guardian_v4.db')
     try:
-        # 💥 核心修復：強制只讀取這 12 個原始欄位，徹底解決 ValueError 崩潰問題
+        # 強制只讀取這 12 個原始欄位，徹底解決 ValueError 崩潰問題
         query = """
         SELECT date, actual_age, body_age, visceral_fat, muscle_mass, bmi, 
                resting_hr, blood_pressure, readiness_score, social_mode_active, 
@@ -214,7 +214,7 @@ if st.session_state.social_mode:
         st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], st.session_state.metrics['body_age'], st.session_state.metrics['actual_age'], False, st.session_state.micro_workouts, st.session_state.water_intake, 2000)
         st.rerun()
 else:
-    # 💥 【新增處】：只在這裡加入「沒應酬」的選項按鈕
+    # 💥 【修改處】：精準替換成「沒喝酒」
     col_soc1, col_soc2 = st.columns(2)
     with col_soc1:
         if st.button("🍷 臨時追加應酬 (啟動生理損害控管)"):
@@ -222,8 +222,8 @@ else:
             st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], st.session_state.metrics['body_age'], st.session_state.metrics['actual_age'], True, st.session_state.micro_workouts, st.session_state.water_intake, 3000)
             st.rerun()
     with col_soc2:
-        if st.button("✅ 今日沒應酬"):
-            st.success("✨ 完美防禦！今日無應酬，維持高效率燃脂！")
+        if st.button("✅ 今日沒喝酒"):
+            st.success("✨ 完美防禦！今日沒喝酒，維持高效率燃脂！")
 
 st.divider()
 
@@ -259,7 +259,6 @@ with tab1:
     history_df = load_history()
     if not history_df.empty:
         display_df = history_df.copy()
-        # 這裡嚴格對齊，完全不會報錯
         display_df.columns = ['日期', '實際年齡', '身體年齡', '內臟脂肪', '骨骼肌(%)', 'BMI', '安靜心率', '血壓(mmHg)', '綜合評分', '有應酬?', '微訓練(次)', '喝水量(cc)']
         st.dataframe(display_df, use_container_width=True, hide_index=True)
     else:
