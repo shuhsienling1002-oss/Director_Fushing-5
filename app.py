@@ -25,16 +25,10 @@ def init_db():
             water_intake_cc INTEGER
         )
     ''')
-    # 【新增功能】自動檢查並加入沒喝酒欄位
-    c.execute("PRAGMA table_info(health_logs)")
-    columns = [column[1] for column in c.fetchall()]
-    if 'no_alcohol' not in columns:
-        c.execute("ALTER TABLE health_logs ADD COLUMN no_alcohol BOOLEAN DEFAULT 1")
     conn.commit()
     conn.close()
 
-# 【新增功能】在參數中加入 no_alcohol
-def calculate_readiness(vf, hr, bp_sys, body_age, actual_age, social_mode, micro_workouts, water_intake, water_goal, no_alcohol=True):
+def calculate_readiness(vf, hr, bp_sys, body_age, actual_age, social_mode, micro_workouts, water_intake, water_goal):
     base_score = 100
     if vf > 10: base_score -= (vf - 10) * 1.5 
     if hr > 65: base_score -= (hr - 65) * 2
@@ -44,14 +38,7 @@ def calculate_readiness(vf, hr, bp_sys, body_age, actual_age, social_mode, micro
     if age_gap > 0:
         base_score -= age_gap * 1
         
-    # 【新增功能】應酬與酒精防禦邏輯
-    if social_mode: 
-        base_score -= 20
-        if no_alcohol:
-            base_score += 20 # 應酬但沒喝酒，抵銷扣分
-            
-    if no_alcohol:
-        base_score += 10 # 沒喝酒的肝臟修復紅利
+    if social_mode: base_score -= 20
     
     base_score += (micro_workouts * 3)
     if water_intake >= water_goal:
@@ -79,8 +66,6 @@ is_weekend = today_date.weekday() >= 5
 # 🧠 狀態機初始化 
 # ==========================================
 if 'social_mode' not in st.session_state: st.session_state.social_mode = False
-# 【新增功能】狀態機加入沒喝酒變數
-if 'no_alcohol' not in st.session_state: st.session_state.no_alcohol = True 
 
 if 'metrics' not in st.session_state: 
     st.session_state.metrics = {
@@ -97,7 +82,7 @@ if 'readiness_score' not in st.session_state:
     st.session_state.readiness_score = calculate_readiness(
         st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], 
         st.session_state.metrics['body_age'], st.session_state.metrics['actual_age'],
-        st.session_state.social_mode, st.session_state.micro_workouts, st.session_state.water_intake, water_goal, st.session_state.no_alcohol
+        st.session_state.social_mode, st.session_state.micro_workouts, st.session_state.water_intake, water_goal
     )
 
 # ==========================================
@@ -128,7 +113,7 @@ with st.expander("📥 點此輸入今日最新數值 (同步體脂計/血壓計
         })
         st.session_state.readiness_score = calculate_readiness(
             new_vf, new_hr, new_bp_sys, new_body_age, new_actual_age, 
-            st.session_state.social_mode, st.session_state.micro_workouts, st.session_state.water_intake, water_goal, st.session_state.no_alcohol
+            st.session_state.social_mode, st.session_state.micro_workouts, st.session_state.water_intake, water_goal
         )
         st.rerun()
 
@@ -169,23 +154,10 @@ else:
         st.session_state.readiness_score = calculate_readiness(
             st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], 
             st.session_state.metrics['body_age'], st.session_state.metrics['actual_age'],
-            st.session_state.social_mode, st.session_state.micro_workouts, st.session_state.water_intake, water_goal, st.session_state.no_alcohol
+            st.session_state.social_mode, st.session_state.micro_workouts, st.session_state.water_intake, water_goal
         )
         st.balloons()
         st.rerun()
-
-# 【新增功能】沒喝酒的獨立選項區塊
-st.divider()
-st.subheader("🚫 代謝防禦")
-is_sober = st.checkbox("🍺 今日沒喝酒 (啟動代謝加速修復)", value=st.session_state.no_alcohol)
-if is_sober != st.session_state.no_alcohol:
-    st.session_state.no_alcohol = is_sober
-    st.session_state.readiness_score = calculate_readiness(
-        st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], 
-        st.session_state.metrics['body_age'], st.session_state.metrics['actual_age'],
-        st.session_state.social_mode, st.session_state.micro_workouts, st.session_state.water_intake, water_goal, is_sober
-    )
-    st.rerun()
 
 st.divider()
 
@@ -199,18 +171,22 @@ col_w1, col_w2 = st.columns(2)
 with col_w1:
     if st.button("➕ 喝一杯水 (250cc)"):
         st.session_state.water_intake += 250
-        st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], st.session_state.metrics['body_age'], st.session_state.metrics['actual_age'], st.session_state.social_mode, st.session_state.micro_workouts, st.session_state.water_intake, water_goal, st.session_state.no_alcohol)
+        st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], st.session_state.metrics['body_age'], st.session_state.metrics['actual_age'], st.session_state.social_mode, st.session_state.micro_workouts, st.session_state.water_intake, water_goal)
         st.rerun()
 with col_w2:
     if st.button("➕ 喝一瓶水 (500cc)"):
         st.session_state.water_intake += 500
-        st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], st.session_state.metrics['body_age'], st.session_state.metrics['actual_age'], st.session_state.social_mode, st.session_state.micro_workouts, st.session_state.water_intake, water_goal, st.session_state.no_alcohol)
+        st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], st.session_state.metrics['body_age'], st.session_state.metrics['actual_age'], st.session_state.social_mode, st.session_state.micro_workouts, st.session_state.water_intake, water_goal)
         st.rerun()
 
 st.divider()
 
 # --- 🗓️ 應酬防禦與酒精衝擊警告 ---
-# 蘇區長原版應酬程式碼完全保留
+st.subheader("🗓️ 飲食控管與應酬防禦")
+with st.expander("🍽️ 點此查看：今日會議便當/桌菜破解法", expanded=False):
+    st.info("💡 核心邏輯：控制進食順序，避免血糖飆升囤積脂肪。")
+    st.markdown("1. 先吃青菜 ➔ 2. 再吃肉類 ➔ 3. 白飯最後且減半。")
+
 if st.session_state.social_mode:
     st.error("🚨 酒精衝擊警報：內臟脂肪 (目前: 25) 面臨核彈級風險")
     
@@ -228,13 +204,19 @@ if st.session_state.social_mode:
 
     if st.button("✅ 應酬平安結束 (啟動 14H 排毒協議)"):
         st.session_state.social_mode = False
-        st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], st.session_state.metrics['body_age'], st.session_state.metrics['actual_age'], False, st.session_state.micro_workouts, st.session_state.water_intake, 2000, st.session_state.no_alcohol)
+        st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], st.session_state.metrics['body_age'], st.session_state.metrics['actual_age'], False, st.session_state.micro_workouts, st.session_state.water_intake, 2000)
         st.rerun()
 else:
-    if st.button("🍷 臨時追加應酬 (啟動生理損害控管)"):
-        st.session_state.social_mode = True
-        st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], st.session_state.metrics['body_age'], st.session_state.metrics['actual_age'], True, st.session_state.micro_workouts, st.session_state.water_intake, 3000, st.session_state.no_alcohol)
-        st.rerun()
+    # 💥 【修改處】：這裡完全依據您的要求，多加一個沒應酬的按鈕
+    col_soc1, col_soc2 = st.columns(2)
+    with col_soc1:
+        if st.button("🍷 臨時追加應酬 (啟動生理損害控管)"):
+            st.session_state.social_mode = True
+            st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], st.session_state.metrics['body_age'], st.session_state.metrics['actual_age'], True, st.session_state.micro_workouts, st.session_state.water_intake, 3000)
+            st.rerun()
+    with col_soc2:
+        if st.button("✅ 今日沒應酬"):
+            st.success("✨ 完美防禦！今日無應酬，維持高效率燃脂！")
 
 st.divider()
 
@@ -243,24 +225,23 @@ if st.button("💾 儲存今日完整日誌"):
     bp_str = f"{st.session_state.metrics['bp_sys']}/{st.session_state.metrics['bp_dia']}"
     conn = sqlite3.connect('fuxing_guardian_v4.db')
     c = conn.cursor()
-    # 【新增功能】存檔時寫入 no_alcohol
     c.execute('''
         INSERT OR REPLACE INTO health_logs 
-        (date, actual_age, body_age, visceral_fat, muscle_mass, bmi, resting_hr, blood_pressure, readiness_score, social_mode_active, micro_workouts_done, water_intake_cc, no_alcohol) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (date, actual_age, body_age, visceral_fat, muscle_mass, bmi, resting_hr, blood_pressure, readiness_score, social_mode_active, micro_workouts_done, water_intake_cc) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         today_str, st.session_state.metrics['actual_age'], st.session_state.metrics['body_age'], 
         st.session_state.metrics['vf'], st.session_state.metrics['muscle'], 
         st.session_state.metrics['bmi'], st.session_state.metrics['hr'], bp_str,
         st.session_state.readiness_score, st.session_state.social_mode, 
-        st.session_state.micro_workouts, st.session_state.water_intake, st.session_state.no_alcohol
+        st.session_state.micro_workouts, st.session_state.water_intake
     ))
     conn.commit()
     conn.close()
     st.success("✅ 區長，今日完整日誌已成功儲存！")
 
 # ==========================================
-# 📖 歷史紀錄與管理模組
+# 📖 歷史紀錄與管理模組 (完整恢復修改功能)
 # ==========================================
 st.divider()
 st.subheader("📖 歷史健康日誌管理")
@@ -271,8 +252,7 @@ with tab1:
     history_df = load_history()
     if not history_df.empty:
         display_df = history_df.copy()
-        # 【新增功能】在歷史表格加入沒喝酒欄位顯示，其餘全用原來的中文名稱
-        display_df.columns = ['日期', '實際年齡', '身體年齡', '內臟脂肪', '骨骼肌(%)', 'BMI', '安靜心率', '血壓(mmHg)', '綜合評分', '有應酬?', '微訓練(次)', '喝水量(cc)', '沒喝酒?']
+        display_df.columns = ['日期', '實際年齡', '身體年齡', '內臟脂肪', '骨骼肌(%)', 'BMI', '安靜心率', '血壓(mmHg)', '綜合評分', '有應酬?', '微訓練(次)', '喝水量(cc)']
         st.dataframe(display_df, use_container_width=True, hide_index=True)
     else:
         st.info("目前還沒有紀錄喔！請按下方的儲存按鈕來建立第一筆日誌。")
@@ -282,15 +262,15 @@ with tab2:
         dates_list = history_df['date'].tolist()
         selected_date = st.selectbox("請選擇要修改的日期：", dates_list)
         
-        # 讀取該日的舊資料以供修改，加入 no_alcohol
+        # 讀取該日的舊資料以供修改
         conn = sqlite3.connect('fuxing_guardian_v4.db')
         c = conn.cursor()
-        c.execute("SELECT actual_age, body_age, visceral_fat, muscle_mass, bmi, resting_hr, blood_pressure, social_mode_active, micro_workouts_done, water_intake_cc, no_alcohol FROM health_logs WHERE date=?", (selected_date,))
+        c.execute("SELECT actual_age, body_age, visceral_fat, muscle_mass, bmi, resting_hr, blood_pressure, social_mode_active, micro_workouts_done, water_intake_cc FROM health_logs WHERE date=?", (selected_date,))
         row = c.fetchone()
         conn.close()
 
         if row:
-            actual_age, body_age, vf, muscle, bmi, hr, bp, social, workouts, water, no_alc = row
+            actual_age, body_age, vf, muscle, bmi, hr, bp, social, workouts, water = row
             try:
                 bp_sys, bp_dia = map(int, bp.split('/'))
             except:
@@ -314,26 +294,22 @@ with tab2:
                     e_bmi = st.number_input("BMI", value=float(bmi), step=0.1, key="ebmi")
                     e_hr = st.number_input("安靜心率", value=int(hr), step=1, key="ehr")
                 
-                # 保留完整的修改選項
                 e_social = st.checkbox("當天有應酬嗎？", value=bool(social), key="esocial")
-                # 【新增功能】修改紀錄時也可以設定是否喝酒
-                e_no_alc = st.checkbox("當天沒喝酒嗎？", value=bool(no_alc), key="enoalc")
 
                 col_btn1, col_btn2 = st.columns(2)
                 with col_btn1:
                     if st.button("💾 更新這筆紀錄", type="primary", use_container_width=True):
                         e_bp_str = f"{e_bp_sys}/{e_bp_dia}"
                         e_goal = 3000 if e_social else 2000
-                        e_score = calculate_readiness(e_vf, e_hr, e_bp_sys, e_body_age, e_actual_age, e_social, e_workouts, e_water, e_goal, e_no_alc)
+                        e_score = calculate_readiness(e_vf, e_hr, e_bp_sys, e_body_age, e_actual_age, e_social, e_workouts, e_water, e_goal)
                         
                         conn = sqlite3.connect('fuxing_guardian_v4.db')
                         c = conn.cursor()
-                        # 【新增功能】更新資料庫寫入 no_alcohol
                         c.execute('''
                             UPDATE health_logs 
-                            SET actual_age=?, body_age=?, visceral_fat=?, muscle_mass=?, bmi=?, resting_hr=?, blood_pressure=?, readiness_score=?, social_mode_active=?, micro_workouts_done=?, water_intake_cc=?, no_alcohol=?
+                            SET actual_age=?, body_age=?, visceral_fat=?, muscle_mass=?, bmi=?, resting_hr=?, blood_pressure=?, readiness_score=?, social_mode_active=?, micro_workouts_done=?, water_intake_cc=?
                             WHERE date=?
-                        ''', (e_actual_age, e_body_age, e_vf, e_muscle, e_bmi, e_hr, e_bp_str, e_score, e_social, e_workouts, e_water, e_no_alc, selected_date))
+                        ''', (e_actual_age, e_body_age, e_vf, e_muscle, e_bmi, e_hr, e_bp_str, e_score, e_social, e_workouts, e_water, selected_date))
                         conn.commit()
                         conn.close()
                         st.success(f"✅ {selected_date} 的紀錄已成功更新！")
