@@ -9,11 +9,10 @@ import pandas as pd
 def init_db():
     conn = sqlite3.connect('fuxing_guardian_v4.db')
     c = conn.cursor()
+    # 1. 建立基礎資料表
     c.execute('''
         CREATE TABLE IF NOT EXISTS health_logs (
             date TEXT PRIMARY KEY,
-            height REAL,
-            weight REAL,
             actual_age INTEGER,
             body_age INTEGER,
             visceral_fat REAL,
@@ -27,6 +26,19 @@ def init_db():
             water_intake_cc INTEGER
         )
     ''')
+    
+    # 2. 🛡️ 資料庫熱修復補丁：自動為舊資料庫新增身高欄位
+    try:
+        c.execute("ALTER TABLE health_logs ADD COLUMN height REAL DEFAULT 170.0")
+    except sqlite3.OperationalError:
+        pass # 如果欄位已經存在，就忽略錯誤繼續執行
+        
+    # 3. 🛡️ 資料庫熱修復補丁：自動為舊資料庫新增體重欄位
+    try:
+        c.execute("ALTER TABLE health_logs ADD COLUMN weight REAL DEFAULT 70.0")
+    except sqlite3.OperationalError:
+        pass # 如果欄位已經存在，就忽略錯誤繼續執行
+
     conn.commit()
     conn.close()
 
@@ -51,7 +63,7 @@ def calculate_readiness(vf, hr, bp_sys, body_age, actual_age, social_mode, micro
 def load_history():
     conn = sqlite3.connect('fuxing_guardian_v4.db')
     try:
-        # 💥 唯一修改處：把 SELECT * 替換成具體的 14 個欄位，徹底解決歷史紀錄 ValueError 崩潰
+        # 指定明確欄位，不受 ALTER TABLE 順序影響
         df = pd.read_sql_query("SELECT date, height, weight, actual_age, body_age, visceral_fat, muscle_mass, bmi, resting_hr, blood_pressure, readiness_score, social_mode_active, micro_workouts_done, water_intake_cc FROM health_logs ORDER BY date DESC", conn)
     except:
         df = pd.DataFrame()
