@@ -12,6 +12,8 @@ def init_db():
     c.execute('''
         CREATE TABLE IF NOT EXISTS health_logs (
             date TEXT PRIMARY KEY,
+            height REAL,
+            weight REAL,
             actual_age INTEGER,
             body_age INTEGER,
             visceral_fat REAL,
@@ -49,8 +51,8 @@ def calculate_readiness(vf, hr, bp_sys, body_age, actual_age, social_mode, micro
 def load_history():
     conn = sqlite3.connect('fuxing_guardian_v4.db')
     try:
-        # 💥 唯一修改處：把 SELECT * 替換成具體的 12 個欄位，徹底解決歷史紀錄 ValueError 崩潰
-        df = pd.read_sql_query("SELECT date, actual_age, body_age, visceral_fat, muscle_mass, bmi, resting_hr, blood_pressure, readiness_score, social_mode_active, micro_workouts_done, water_intake_cc FROM health_logs ORDER BY date DESC", conn)
+        # 💥 唯一修改處：把 SELECT * 替換成具體的 14 個欄位，徹底解決歷史紀錄 ValueError 崩潰
+        df = pd.read_sql_query("SELECT date, height, weight, actual_age, body_age, visceral_fat, muscle_mass, bmi, resting_hr, blood_pressure, readiness_score, social_mode_active, micro_workouts_done, water_intake_cc FROM health_logs ORDER BY date DESC", conn)
     except:
         df = pd.DataFrame()
     conn.close()
@@ -70,6 +72,7 @@ if 'social_mode' not in st.session_state: st.session_state.social_mode = False
 
 if 'metrics' not in st.session_state: 
     st.session_state.metrics = {
+        'height': 170.0, 'weight': 70.0,
         'actual_age': 54, 'body_age': 69,
         'vf': 25.0, 'muscle': 26.7, 'bmi': 33.8, 'hr': 63, 'bp_sys': 119, 'bp_dia': 79
     }
@@ -96,10 +99,12 @@ st.markdown(f"**蘇區長，早安。今天是 {today_str} {'(週末重置日)' 
 with st.expander("📥 點此輸入今日最新數值 (同步體脂計/血壓計)", expanded=False):
     col_a, col_b, col_c = st.columns(3)
     with col_a:
+        new_height = st.number_input("身高 (cm)", value=st.session_state.metrics.get('height', 170.0), step=0.1)
         new_actual_age = st.number_input("實際年齡", value=st.session_state.metrics['actual_age'], step=1)
         new_vf = st.number_input("內臟脂肪等級", value=st.session_state.metrics['vf'], step=0.5)
         new_bp_sys = st.number_input("收縮壓 (高壓)", value=st.session_state.metrics['bp_sys'], step=1)
     with col_b:
+        new_weight = st.number_input("體重 (kg)", value=st.session_state.metrics.get('weight', 70.0), step=0.1)
         new_body_age = st.number_input("身體年齡", value=st.session_state.metrics['body_age'], step=1)
         new_muscle = st.number_input("骨骼肌率 (%)", value=st.session_state.metrics['muscle'], step=0.1)
         new_bp_dia = st.number_input("舒張壓 (低壓)", value=st.session_state.metrics['bp_dia'], step=1)
@@ -109,6 +114,7 @@ with st.expander("📥 點此輸入今日最新數值 (同步體脂計/血壓計
         
     if st.button("🔄 更新今日數值"):
         st.session_state.metrics.update({
+            'height': new_height, 'weight': new_weight,
             'actual_age': new_actual_age, 'body_age': new_body_age,
             'vf': new_vf, 'muscle': new_muscle, 'bmi': new_bmi, 'hr': new_hr, 'bp_sys': new_bp_sys, 'bp_dia': new_bp_dia
         })
@@ -212,7 +218,7 @@ if st.session_state.social_mode:
     * ☢️ **內臟脂肪核爆**：{'如果您喝的是啤酒，糖分與酒精的協同作用會讓脂肪囤積效率提高 200%！' if '啤酒' in alc_type else '請嚴守 1:1 水分法則，強迫肝臟降溫。'}
     """)
 
-    if st.button("✅ 應酬平安結束 (啟動 14H 排毒協議)"):
+    if st.button("✅ 應酬平安結束 (啟動 14H排毒協議)"):
         st.session_state.social_mode = False
         st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], st.session_state.metrics['body_age'], st.session_state.metrics['actual_age'], False, st.session_state.micro_workouts, st.session_state.water_intake, 2000)
         st.rerun()
@@ -237,10 +243,11 @@ if st.button("💾 儲存今日完整日誌"):
     c = conn.cursor()
     c.execute('''
         INSERT OR REPLACE INTO health_logs 
-        (date, actual_age, body_age, visceral_fat, muscle_mass, bmi, resting_hr, blood_pressure, readiness_score, social_mode_active, micro_workouts_done, water_intake_cc) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (date, height, weight, actual_age, body_age, visceral_fat, muscle_mass, bmi, resting_hr, blood_pressure, readiness_score, social_mode_active, micro_workouts_done, water_intake_cc) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
-        today_str, st.session_state.metrics['actual_age'], st.session_state.metrics['body_age'], 
+        today_str, st.session_state.metrics['height'], st.session_state.metrics['weight'],
+        st.session_state.metrics['actual_age'], st.session_state.metrics['body_age'], 
         st.session_state.metrics['vf'], st.session_state.metrics['muscle'], 
         st.session_state.metrics['bmi'], st.session_state.metrics['hr'], bp_str,
         st.session_state.readiness_score, st.session_state.social_mode, 
@@ -262,7 +269,7 @@ with tab1:
     history_df = load_history()
     if not history_df.empty:
         display_df = history_df.copy()
-        display_df.columns = ['日期', '實際年齡', '身體年齡', '內臟脂肪', '骨骼肌(%)', 'BMI', '安靜心率', '血壓(mmHg)', '綜合評分', '有應酬?', '微訓練(次)', '喝水量(cc)']
+        display_df.columns = ['日期', '身高(cm)', '體重(kg)', '實際年齡', '身體年齡', '內臟脂肪', '骨骼肌(%)', 'BMI', '安靜心率', '血壓(mmHg)', '綜合評分', '有應酬?', '微訓練(次)', '喝水量(cc)']
         st.dataframe(display_df, use_container_width=True, hide_index=True)
     else:
         st.info("目前還沒有紀錄喔！請按下方的儲存按鈕來建立第一筆日誌。")
@@ -275,12 +282,12 @@ with tab2:
         # 讀取該日的舊資料以供修改
         conn = sqlite3.connect('fuxing_guardian_v4.db')
         c = conn.cursor()
-        c.execute("SELECT actual_age, body_age, visceral_fat, muscle_mass, bmi, resting_hr, blood_pressure, social_mode_active, micro_workouts_done, water_intake_cc FROM health_logs WHERE date=?", (selected_date,))
+        c.execute("SELECT height, weight, actual_age, body_age, visceral_fat, muscle_mass, bmi, resting_hr, blood_pressure, social_mode_active, micro_workouts_done, water_intake_cc FROM health_logs WHERE date=?", (selected_date,))
         row = c.fetchone()
         conn.close()
 
         if row:
-            actual_age, body_age, vf, muscle, bmi, hr, bp, social, workouts, water = row
+            height, weight, actual_age, body_age, vf, muscle, bmi, hr, bp, social, workouts, water = row
             try:
                 bp_sys, bp_dia = map(int, bp.split('/'))
             except:
@@ -291,11 +298,13 @@ with tab2:
             with st.container(border=True):
                 col_e1, col_e2, col_e3 = st.columns(3)
                 with col_e1:
+                    e_height = st.number_input("身高 (cm)", value=float(height) if height else 170.0, step=0.1, key="eheight")
                     e_actual_age = st.number_input("實際年齡", value=int(actual_age), step=1, key="eactualage")
                     e_vf = st.number_input("內臟脂肪", value=float(vf), step=0.5, key="evf")
                     e_bp_sys = st.number_input("收縮壓 (高壓)", value=int(bp_sys), step=1, key="ebpsys")
                     e_water = st.number_input("喝水量 (cc)", value=int(water), step=100, key="ewater")
                 with col_e2:
+                    e_weight = st.number_input("體重 (kg)", value=float(weight) if weight else 70.0, step=0.1, key="eweight")
                     e_body_age = st.number_input("身體年齡", value=int(body_age), step=1, key="ebodyage")
                     e_muscle = st.number_input("骨骼肌 (%)", value=float(muscle), step=0.1, key="emuscle")
                     e_bp_dia = st.number_input("舒張壓 (低壓)", value=int(bp_dia), step=1, key="ebpdia")
@@ -317,9 +326,9 @@ with tab2:
                         c = conn.cursor()
                         c.execute('''
                             UPDATE health_logs 
-                            SET actual_age=?, body_age=?, visceral_fat=?, muscle_mass=?, bmi=?, resting_hr=?, blood_pressure=?, readiness_score=?, social_mode_active=?, micro_workouts_done=?, water_intake_cc=?
+                            SET height=?, weight=?, actual_age=?, body_age=?, visceral_fat=?, muscle_mass=?, bmi=?, resting_hr=?, blood_pressure=?, readiness_score=?, social_mode_active=?, micro_workouts_done=?, water_intake_cc=?
                             WHERE date=?
-                        ''', (e_actual_age, e_body_age, e_vf, e_muscle, e_bmi, e_hr, e_bp_str, e_score, e_social, e_workouts, e_water, selected_date))
+                        ''', (e_height, e_weight, e_actual_age, e_body_age, e_vf, e_muscle, e_bmi, e_hr, e_bp_str, e_score, e_social, e_workouts, e_water, selected_date))
                         conn.commit()
                         conn.close()
                         st.success(f"✅ {selected_date} 的紀錄已成功更新！")
