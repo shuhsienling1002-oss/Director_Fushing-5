@@ -9,7 +9,7 @@ import pandas as pd
 def init_db():
     conn = sqlite3.connect('fuxing_guardian_v4.db')
     c = conn.cursor()
-    # 1. 建立基礎資料表
+    # 1. 確保基礎表存在 (舊版結構)
     c.execute('''
         CREATE TABLE IF NOT EXISTS health_logs (
             date TEXT PRIMARY KEY,
@@ -26,18 +26,16 @@ def init_db():
             water_intake_cc INTEGER
         )
     ''')
-    
-    # 2. 🛡️ 資料庫熱修復補丁：自動為舊資料庫新增身高欄位
-    try:
+    conn.commit()
+
+    # 2. 🛡️ 終極升級防禦：使用 PRAGMA 掃描並自動擴充欄位 (破解 Streamlit Cloud 限制)
+    c.execute("PRAGMA table_info(health_logs)")
+    columns = [info[1] for info in c.fetchall()]
+
+    if 'height' not in columns:
         c.execute("ALTER TABLE health_logs ADD COLUMN height REAL DEFAULT 170.0")
-    except sqlite3.OperationalError:
-        pass # 如果欄位已經存在，就忽略錯誤繼續執行
-        
-    # 3. 🛡️ 資料庫熱修復補丁：自動為舊資料庫新增體重欄位
-    try:
+    if 'weight' not in columns:
         c.execute("ALTER TABLE health_logs ADD COLUMN weight REAL DEFAULT 70.0")
-    except sqlite3.OperationalError:
-        pass # 如果欄位已經存在，就忽略錯誤繼續執行
 
     conn.commit()
     conn.close()
@@ -63,7 +61,7 @@ def calculate_readiness(vf, hr, bp_sys, body_age, actual_age, social_mode, micro
 def load_history():
     conn = sqlite3.connect('fuxing_guardian_v4.db')
     try:
-        # 指定明確欄位，不受 ALTER TABLE 順序影響
+        # 💥 明確指定 14 個欄位
         df = pd.read_sql_query("SELECT date, height, weight, actual_age, body_age, visceral_fat, muscle_mass, bmi, resting_hr, blood_pressure, readiness_score, social_mode_active, micro_workouts_done, water_intake_cc FROM health_logs ORDER BY date DESC", conn)
     except:
         df = pd.DataFrame()
@@ -159,7 +157,6 @@ st.divider()
 
 # --- 擴充模組整合區 ---
 if is_weekend:
-    # ✅ 嚴格依照指示新增：週末實事求是選項
     st.subheader("🌲 【週末重置模式啟動】清空一週壓力與胰島素殘留")
     
     weekend_fasting = st.checkbox("14小時微斷食：今日早餐延後至 10:00，清空胰島素。")
@@ -259,7 +256,6 @@ if st.session_state.social_mode:
         st.session_state.readiness_score = calculate_readiness(st.session_state.metrics['vf'], st.session_state.metrics['hr'], st.session_state.metrics['bp_sys'], st.session_state.metrics['body_age'], st.session_state.metrics['actual_age'], False, st.session_state.micro_workouts, st.session_state.water_intake, 2000)
         st.rerun()
 else:
-    # ✅ 嚴格依照指示新增：今日沒喝酒選項
     col_soc1, col_soc2 = st.columns(2)
     with col_soc1:
         if st.button("🍷 臨時追加應酬 (啟動生理損害控管)"):
